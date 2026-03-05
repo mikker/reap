@@ -261,10 +261,12 @@ async function release(configState, opts = {}) {
 
 function resolveSoloMode(releaseCfg, opts) {
   if (opts && opts.solo) return true
-  if (typeof releaseCfg.solo === 'boolean') return releaseCfg.solo
 
   const multisig = releaseCfg.multisig || {}
-  return multisig.enabled === false
+  if (multisig.enabled === false) return true
+
+  if (typeof releaseCfg.solo === 'boolean') return releaseCfg.solo
+  return false
 }
 
 function inferSigningFromForge(releaseCfg, projectDir) {
@@ -1534,5 +1536,6 @@ async function runHypercoreSignAutosign(baseCommand, signingRequest, opts = {}) 
 }
 
 module.exports = {
-  release
+  release,
+  resolveSoloMode
 }

@@ -1,4 +1,5 @@
 const path = require('path')
+const { isDeepStrictEqual } = require('node:util')
 const { exists, readJson, writeJson } = require('./utils')
 
 const DEFAULT_CONFIG = {
@@ -67,7 +68,7 @@ const DEFAULT_CONFIG = {
 function loadConfig(configPath) {
   const absConfigPath = path.resolve(configPath)
   if (!exists(absConfigPath)) {
-    writeJson(absConfigPath, DEFAULT_CONFIG)
+    writeJson(absConfigPath, compactConfig(clone(DEFAULT_CONFIG)))
     return {
       config: clone(DEFAULT_CONFIG),
       path: absConfigPath,
@@ -86,7 +87,7 @@ function loadConfig(configPath) {
 }
 
 function saveConfig(configPath, config) {
-  writeJson(configPath, config)
+  writeJson(configPath, compactConfig(config))
 }
 
 function clone(value) {
@@ -112,6 +113,37 @@ function deepMerge(target, source) {
     target[key] = value
   }
   return target
+}
+
+function compactConfig(config) {
+  const compacted = stripDefaults(config, DEFAULT_CONFIG)
+  return compacted && isObject(compacted) ? compacted : {}
+}
+
+function stripDefaults(value, defaults) {
+  if (value == null) return undefined
+
+  if (Array.isArray(value)) {
+    if (Array.isArray(defaults) && isDeepStrictEqual(value, defaults)) return undefined
+    if (value.length === 0) return undefined
+    return value
+  }
+
+  if (isObject(value)) {
+    const defaultsObject = isObject(defaults) ? defaults : {}
+    const out = {}
+
+    for (const [key, item] of Object.entries(value)) {
+      const stripped = stripDefaults(item, defaultsObject[key])
+      if (stripped !== undefined) out[key] = stripped
+    }
+
+    return Object.keys(out).length > 0 ? out : undefined
+  }
+
+  if (typeof value === 'string' && value.trim() === '') return undefined
+  if (defaults !== undefined && isDeepStrictEqual(value, defaults)) return undefined
+  return value
 }
 
 module.exports = {

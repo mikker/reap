@@ -507,8 +507,14 @@ function capitalize(value) {
 }
 
 function normalizeReleaseMode(releaseCfg) {
+  const multisigDisabled = Boolean(releaseCfg.multisig && releaseCfg.multisig.enabled === false)
+  if (multisigDisabled) {
+    releaseCfg.solo = true
+    return
+  }
+
   if (typeof releaseCfg.solo !== 'boolean') {
-    releaseCfg.solo = !Boolean(releaseCfg.multisig && releaseCfg.multisig.enabled)
+    releaseCfg.solo = false
   }
 
   if (releaseCfg.solo && releaseCfg.multisig) {
