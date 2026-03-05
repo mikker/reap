@@ -48,6 +48,7 @@ async function release(configState, opts = {}) {
   }
 
   const pkg = readJson(packagePath)
+  inferSigningFromForge(releaseCfg, projectDir)
   ensureMultisigDefaults(releaseCfg.multisig, pkg.name || 'app')
   mergeLegacySigners(releaseCfg.multisig, projectDir)
   const soloMode = resolveSoloMode(releaseCfg, opts)
@@ -262,6 +263,55 @@ function resolveSoloMode(releaseCfg, opts) {
 
   const multisig = releaseCfg.multisig || {}
   return multisig.enabled === false
+}
+
+function inferSigningFromForge(releaseCfg, projectDir) {
+  const hints = detectForgeHints(projectDir)
+  if (!hints) return
+
+  if (!releaseCfg.signing) releaseCfg.signing = {}
+  if (!releaseCfg.signing.notaryProfile) releaseCfg.signing.notaryProfile = {}
+  if (!releaseCfg.signing.env) releaseCfg.signing.env = {}
+
+  const profile = releaseCfg.signing.notaryProfile
+  if (!clean(profile.identity) && clean(hints.identity)) {
+    profile.identity = hints.identity
+  }
+  if (!clean(profile.keychainProfile) && clean(hints.keychainProfile)) {
+    profile.keychainProfile = hints.keychainProfile
+  }
+  if (!clean(profile.teamId) && clean(hints.teamId)) {
+    profile.teamId = hints.teamId
+  }
+
+  if (!clean(releaseCfg.signing.env.MAC_CODESIGN_IDENTITY) && clean(profile.identity)) {
+    releaseCfg.signing.env.MAC_CODESIGN_IDENTITY = profile.identity
+  }
+}
+
+function detectForgeHints(projectDir) {
+  const candidates = ['forge.config.cjs', 'forge.config.js']
+  for (const file of candidates) {
+    const abs = path.join(projectDir, file)
+    if (!exists(abs)) continue
+    const source = fs.readFileSync(abs, 'utf8')
+    return {
+      identity: extractLiteral(source, /identity\s*:\s*['"`]([^'"`]+)['"`]/),
+      keychainProfile: extractLiteral(source, /keychainProfile\s*:\s*['"`]([^'"`]+)['"`]/),
+      teamId: extractLiteral(source, /teamId\s*:\s*['"`]([^'"`]+)['"`]/)
+    }
+  }
+  return null
+}
+
+function extractLiteral(source, pattern) {
+  const match = pattern.exec(source)
+  return match ? match[1] : ''
+}
+
+function clean(value) {
+  if (typeof value !== 'string') return ''
+  return value.trim()
 }
 
 async function resolveTools() {

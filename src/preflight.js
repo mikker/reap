@@ -1,4 +1,5 @@
 const path = require('path')
+const fs = require('fs')
 const { exists, parseLink, resolveFrom } = require('./utils')
 const { validateMultisig } = require('./multisig-state')
 
@@ -22,7 +23,7 @@ function runPreflight(input) {
   const deployDir = resolveFrom(projectDir, build.deployDir)
   const hasDeployDir = Boolean(deployDir && exists(deployDir))
   const hasBuildCommands = Array.isArray(build.commands) && build.commands.some((cmd) => clean(cmd))
-  const hasArtifacts = hasConfiguredArtifacts(projectDir, build)
+  const hasArtifacts = hasConfiguredArtifacts(projectDir, build) || hasDiscoveredArtifacts(projectDir)
 
   if (!hasDeployDir && !hasBuildCommands && !hasArtifacts) {
     errors.push('No deploy inputs found: set build.commands, build.deployDir, or build.pearBuild.artifacts')
@@ -57,6 +58,89 @@ function hasConfiguredArtifacts(projectDir, build) {
     const abs = resolveFrom(projectDir, entry)
     return abs && exists(abs)
   })
+}
+
+function hasDiscoveredArtifacts(projectDir) {
+  const outDir = path.resolve(projectDir, 'out')
+  if (!exists(outDir)) return false
+
+  const files = listFilesDeep(outDir)
+  const bundles = listAppBundles(outDir)
+
+  for (const bundle of bundles) {
+    if (classifyArtifact(bundle, 'app')) return true
+  }
+  for (const file of files) {
+    if (classifyArtifact(file, 'file')) return true
+  }
+  return false
+}
+
+function listFilesDeep(root) {
+  const files = []
+  walk(root)
+  return files
+
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(abs)
+      else files.push(abs)
+    }
+  }
+}
+
+function listAppBundles(root) {
+  const bundles = []
+  walk(root)
+  return bundles
+
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name)
+      if (!entry.isDirectory()) continue
+      if (/\.app$/i.test(entry.name) && exists(path.join(abs, 'Contents', 'Info.plist'))) {
+        bundles.push(abs)
+        continue
+      }
+      walk(abs)
+    }
+  }
+}
+
+function classifyArtifact(filePath, kind) {
+  const normalized = filePath.replaceAll('\\', '/').toLowerCase()
+
+  const isDarwinArm64 = hasTarget(normalized, 'darwin', 'arm64') || hasTarget(normalized, 'darwin', 'aarch64')
+  const isDarwinX64 = hasTarget(normalized, 'darwin', 'x64')
+  const isLinuxArm64 = hasTarget(normalized, 'linux', 'arm64') || hasTarget(normalized, 'linux', 'aarch64')
+  const isLinuxX64 = hasTarget(normalized, 'linux', 'x64')
+  const isWin32X64 = hasTarget(normalized, 'win32', 'x64')
+
+  if (kind === 'app') {
+    return isDarwinArm64 || isDarwinX64
+  }
+
+  if (kind === 'file' && /\.appimage$/i.test(normalized)) {
+    return isLinuxArm64 || isLinuxX64
+  }
+
+  if (kind === 'file' && /\.exe$/i.test(normalized) && isWin32X64) {
+    return true
+  }
+
+  return false
+}
+
+function hasTarget(normalizedPath, platform, arch) {
+  return (
+    normalizedPath.includes(`/${platform}/${arch}/`) ||
+    normalizedPath.includes(`-${platform}-${arch}/`) ||
+    normalizedPath.includes(`-${platform}-${arch}.`) ||
+    normalizedPath.includes(`-${platform}-${arch}-`)
+  )
 }
 
 function clean(value) {
