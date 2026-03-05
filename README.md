@@ -139,6 +139,7 @@ Note: final multisig verify/commit still requires at least two independent full 
 For lone-developer releases, use `reap release --solo` (or set `release.solo: true`) so release goes straight through stage + provision without multisig peer requirements.
 
 Release output is intentionally compact: underlying tool output is swallowed and replaced by short step-by-step status lines with activity indicators.
+Build-step warnings are surfaced explicitly; warning-only non-zero build exits are treated as warnings and do not abort release.
 
 `reap` now supports single-config operation: `.reap.json` is the source of truth for signer roster and multisig settings. `multisig.json` is optional legacy compatibility; when omitted, reap generates a temporary runtime config automatically.
 

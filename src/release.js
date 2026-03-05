@@ -16,6 +16,7 @@ const {
 const { saveConfig } = require('./config')
 const { DEFAULT_KEYS_ROOT, generateManagedKeys } = require('./keys')
 const { createReleaseUi } = require('./release-ui')
+const { formatOutputTail, isWarningOnlyFailure, warningLines } = require('./build-output')
 const { createCheckpointManager } = require('./checkpoint')
 const { runPreflight } = require('./preflight')
 const {
@@ -523,12 +524,33 @@ async function runBuildCommands(projectDir, releaseCfg, buildEnv, opts, ui) {
   for (const command of commands) {
     if (!command || typeof command !== 'string') continue
     if (ui) ui.info(`Build: ${command}`)
-    await run('sh', ['-lc', command], {
+    const result = await run('sh', ['-lc', command], {
       cwd: projectDir,
       env: buildEnv,
       label: 'build command',
-      streamOutput: false
+      streamOutput: false,
+      allowFailure: true
     })
+
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n')
+    const warnings = warningLines(output)
+    if (warnings.length > 0 && ui) {
+      ui.warn(`Build warnings (${warnings.length}) in "${command}"`)
+      const preview = warnings[0]
+      if (preview) ui.warn(preview)
+    }
+
+    if (result.code === 0) continue
+    if (isWarningOnlyFailure(result)) {
+      if (ui) ui.warn(`Build exited ${result.code} with warnings only, continuing`)
+      continue
+    }
+
+    const tail = formatOutputTail(output)
+    throw new Error(
+      `Build command failed (${command})` +
+        (tail ? `\n${tail}` : '')
+    )
   }
 }
 
