@@ -56,6 +56,32 @@ test('preflight passes with deployDir and valid solo setup', () => {
   assert.equal(result.errors.length, 0)
 })
 
+test('preflight passes with discovered out artifacts and no explicit build inputs', () => {
+  const dir = makeTempDir()
+  const appBundle = path.join(dir, 'out', 'make', 'zip', 'darwin', 'arm64', 'Demo.app')
+  fs.mkdirSync(path.join(appBundle, 'Contents'), { recursive: true })
+  fs.writeFileSync(path.join(appBundle, 'Contents', 'Info.plist'), '')
+
+  const releaseCfg = {
+    build: { commands: [], deployDir: null, pearBuild: { artifacts: {} } },
+    signing: { env: {}, notaryProfile: {} }
+  }
+  const multisig = {}
+  ensureMultisigDefaults(multisig, 'demo')
+  multisig.enabled = false
+
+  const result = runPreflight({
+    projectDir: dir,
+    releaseCfg,
+    stageLink: 'pear://abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd',
+    provisionLink: 'pear://efghefghefghefghefghefghefghefghefghefghefghefgh',
+    multisig,
+    dryRun: false
+  })
+
+  assert.equal(result.errors.length, 0)
+})
+
 test('preflight reports multisig quorum mismatch', () => {
   const dir = makeTempDir()
   const deployDir = path.join(dir, 'deploy')
