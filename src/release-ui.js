@@ -1,3 +1,6 @@
+const chalk = require('chalk')
+const ora = require('ora')
+
 function createReleaseUi(opts = {}) {
   return new ReleaseUi(opts)
 }
@@ -5,11 +8,9 @@ function createReleaseUi(opts = {}) {
 class ReleaseUi {
   constructor(opts = {}) {
     this.useColor = opts.color !== false && process.stdout.isTTY && !process.env.NO_COLOR
-    this.useSpinner = opts.spinner !== false && process.stdout.isTTY
     this.silent = Boolean(opts.silent)
-    this.frames = ['-', '\\', '|', '/']
-    this.frameIndex = 0
-    this.timer = null
+    this.useSpinner = opts.spinner !== false && process.stdout.isTTY && !this.silent
+    this.spinner = null
   }
 
   header(title) {
@@ -51,62 +52,65 @@ class ReleaseUi {
 
   _beginSpinner(label) {
     if (this.silent) return
-    this._endSpinner()
+    this._stopSpinner()
 
     if (!this.useSpinner) {
       this.info(label)
       return
     }
 
-    this.timer = setInterval(() => {
-      const frame = this.frames[this.frameIndex % this.frames.length]
-      this.frameIndex += 1
-      process.stdout.write(`\r${this._style('cyan', frame)} ${label}`)
-    }, 80)
+    this.spinner = ora({
+      text: label,
+      discardStdin: false
+    }).start()
   }
 
   _endSpinner(state, label) {
     if (this.silent) return
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
-    }
-
-    if (!label) return
-
-    if (this.useSpinner) {
-      process.stdout.write('\r\x1b[2K')
-    }
-
-    if (state === 'success') {
-      this.success(label)
+    if (this.spinner) {
+      if (state === 'success') this.spinner.succeed(label)
+      else if (state === 'error') this.spinner.fail(label)
+      else this.spinner.stop()
+      this.spinner = null
       return
     }
 
-    if (state === 'error') {
-      this.error(label)
-    }
+    if (!label) return
+    if (state === 'success') this.success(label)
+    else if (state === 'error') this.error(label)
+  }
+
+  _stopSpinner() {
+    if (!this.spinner) return
+    this.spinner.stop()
+    this.spinner = null
   }
 
   _line(message) {
     if (this.silent) return
-    this._endSpinner()
+    if (this.spinner) {
+      const activeText = this.spinner.text
+      this.spinner.stop()
+      process.stdout.write(`${message}\n`)
+      this.spinner = ora({
+        text: activeText,
+        discardStdin: false
+      }).start()
+      return
+    }
+
     process.stdout.write(`${message}\n`)
   }
 
   _style(kind, text) {
     if (!this.useColor) return text
-    const colors = {
-      dim: ['\x1b[2m', '\x1b[22m'],
-      bold: ['\x1b[1m', '\x1b[22m'],
-      red: ['\x1b[31m', '\x1b[39m'],
-      green: ['\x1b[32m', '\x1b[39m'],
-      yellow: ['\x1b[33m', '\x1b[39m'],
-      cyan: ['\x1b[36m', '\x1b[39m']
-    }
-    const pair = colors[kind]
-    if (!pair) return text
-    return `${pair[0]}${text}${pair[1]}`
+    if (kind === 'dim') return chalk.dim(text)
+    if (kind === 'bold') return chalk.bold(text)
+    if (kind === 'red') return chalk.red(text)
+    if (kind === 'green') return chalk.green(text)
+    if (kind === 'yellow') return chalk.yellow(text)
+    if (kind === 'cyan') return chalk.cyan(text)
+    return text
   }
 }
 
