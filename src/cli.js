@@ -102,7 +102,7 @@ async function main(argv) {
   await program.parseAsync(['node', 'reap', ...argv], { from: 'node' })
 }
 
-function printSummary(outcome, ui = createReleaseUi()) {
+function printSummary(outcome, ui) {
   ui.header('Release complete')
   ui.detail('Deploy', outcome.deployDir)
   ui.detail('Stage', outcome.sourceVerlink)
@@ -118,7 +118,7 @@ function printSummary(outcome, ui = createReleaseUi()) {
   }
 }
 
-async function maybeSeed(outcome, options, ui = createReleaseUi()) {
+async function maybeSeed(outcome, options, ui) {
   if (options.dryRun) return
 
   const seedLink = pickSeedLink(outcome)
