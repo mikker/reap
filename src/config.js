@@ -35,7 +35,7 @@ const DEFAULT_CONFIG = {
     },
     multisig: {
       enabled: false,
-      configPath: './multisig.json',
+      configPath: null,
       storagePath: './.reap/multisig-storage',
       keysRoot: './.reap/keys',
       firstCommit: null,
@@ -46,12 +46,20 @@ const DEFAULT_CONFIG = {
       publicKeys: [],
       namespace: null,
       quorum: 1,
+      signers: [],
       responses: [],
       responsesFile: null,
-      autoSigners: []
+      autoSigners: [],
+      collect: {
+        requestCommand: null,
+        responsesCommand: null,
+        responsesDir: null
+      },
+      minSeedPeers: 2
     },
     state: {
-      lastRelease: null
+      lastRelease: null,
+      checkpoint: null
     }
   }
 }

@@ -16,12 +16,25 @@ const {
 const { saveConfig } = require('./config')
 const { DEFAULT_KEYS_ROOT, generateManagedKeys } = require('./keys')
 const { createReleaseUi } = require('./release-ui')
+const { createCheckpointManager } = require('./checkpoint')
+const { runPreflight } = require('./preflight')
+const {
+  addSigner,
+  buildMultisigConfig,
+  collectCommandEnv,
+  ensureMultisigDefaults,
+  mergeLegacySigners,
+  resolveMultisigConfigPath,
+  syncDerivedSignerFields,
+  validateMultisig
+} = require('./multisig-state')
 
 async function release(configState, opts = {}) {
   const { config, path: configPath } = configState
   const releaseCfg = config.release
   const configBaseDir = path.dirname(configPath)
   const ui = opts.ui || createReleaseUi()
+  const save = () => saveConfig(configPath, config)
 
   const projectDir = resolveFrom(configBaseDir, releaseCfg.projectDir)
   if (!projectDir || !exists(projectDir)) {
@@ -34,121 +47,211 @@ async function release(configState, opts = {}) {
   }
 
   const pkg = readJson(packagePath)
+  ensureMultisigDefaults(releaseCfg.multisig, pkg.name || 'app')
+  mergeLegacySigners(releaseCfg.multisig, projectDir)
   const soloMode = resolveSoloMode(releaseCfg, opts)
-
-  const tools = await ui.step('Checking toolchain', async () => resolveTools())
-
-  await ui.step('Ensuring stage/provision links', async () => {
-    await ensureLinks(releaseCfg, tools, projectDir, ui)
-  })
-  saveConfig(configPath, config)
-
-  const stageLink = releaseCfg.links.stage
-  const provisionLink = releaseCfg.links.provision
-
-  if (!stageLink || !provisionLink) {
-    throw new Error('stage and provision links are required')
-  }
-
-  await ui.step('Applying version strategy', async () => {
-    await maybeRunVersioning(projectDir, releaseCfg, opts)
+  const checkpoint = createCheckpointManager({
+    releaseCfg,
+    save,
+    resume: Boolean(opts.resume)
   })
 
-  inferDefaultBuildCommands(pkg, releaseCfg, projectDir)
+  try {
+    const tools = await ui.step('Checking toolchain', async () => resolveTools())
+    checkpoint.markStep('tools')
 
-  const multisig = await ui.step('Preparing release mode', async () => {
-    return setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, {
-      solo: soloMode,
-      ui
+    await ui.step('Ensuring stage/provision links', async () => {
+      await ensureLinks(releaseCfg, tools, projectDir, ui)
     })
-  })
-  saveConfig(configPath, config)
+    checkpoint.markStep('links')
 
-  const upgradeLink = multisig.link || provisionLink || stageLink
-  await ui.step('Updating package upgrade target', async () => {
-    maybeUpdatePackageUpgrade(packagePath, upgradeLink, opts, ui)
-  })
+    const stageLink = releaseCfg.links.stage
+    const provisionLink = releaseCfg.links.provision
 
-  const buildEnv = buildReleaseEnv(releaseCfg)
+    if (!stageLink || !provisionLink) {
+      throw new Error('stage and provision links are required')
+    }
 
-  await ui.step('Running build commands', async () => {
-    await runBuildCommands(projectDir, releaseCfg, buildEnv, ui)
-  })
-
-  const deployDir = await ui.step('Preparing deploy directory', async () => {
-    return resolveDeployDir(projectDir, pkg, releaseCfg, tools, buildEnv, ui)
-  })
-
-  const stageResult = await ui.step('Staging deploy directory', async () => {
-    return stageDeployDir(tools, stageLink, deployDir, opts)
-  })
-  const sourceVerlink = stageResult.verlink
-
-  let productionVersionedLink = null
-  let provisionResult = null
-  let multisigResult = null
-
-  if (!opts.dryRun) {
-    productionVersionedLink = await ui.step('Resolving production base', async () => {
-      return resolveProductionVersionedLink(tools, releaseCfg)
+    await ui.step('Applying version strategy', async () => {
+      await maybeRunVersioning(projectDir, releaseCfg, opts)
     })
+    checkpoint.markStep('version')
 
-    provisionResult = await ui.step('Provisioning release', async () => {
-      return provision(tools, sourceVerlink, provisionLink, productionVersionedLink, opts, ui)
-    })
+    inferDefaultBuildCommands(pkg, releaseCfg, projectDir)
 
-    if (multisig.enabled) {
-      multisigResult = await ui.step('Running multisig release flow', async () => {
-        return runMultisigFlow({
-          tools,
-          projectDir,
-          multisig,
-          provisionLink,
-          opts,
-          ui
-        })
+    const multisig = await ui.step('Preparing release mode', async () => {
+      return setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, {
+        solo: soloMode,
+        ui,
+        runId: checkpoint.runId
       })
+    })
+    checkpoint.markStep('mode', {
+      multisig: {
+        enabled: multisig.enabled,
+        link: multisig.link || null
+      }
+    })
+
+    await ui.step('Running preflight checks', async () => {
+      const preflight = runPreflight({
+        projectDir,
+        releaseCfg,
+        stageLink,
+        provisionLink,
+        multisig,
+        dryRun: Boolean(opts.dryRun)
+      })
+
+      for (const warning of preflight.warnings) ui.warn(warning)
+      if (preflight.errors.length > 0) {
+        throw new Error(`Preflight failed: ${preflight.errors.join('; ')}`)
+      }
+    })
+    checkpoint.markStep('preflight')
+
+    const upgradeLink = multisig.link || provisionLink || stageLink
+    await ui.step('Updating package upgrade target', async () => {
+      maybeUpdatePackageUpgrade(packagePath, upgradeLink, opts, ui)
+    })
+    checkpoint.markStep('upgrade', { updatedUpgrade: upgradeLink })
+
+    const buildEnv = buildReleaseEnv(releaseCfg)
+
+    await ui.step('Running build commands', async () => {
+      await runBuildCommands(projectDir, releaseCfg, buildEnv, opts, ui)
+    })
+    checkpoint.markStep('build-commands')
+
+    const deployDir = await ui.step('Preparing deploy directory', async () => {
+      return resolveDeployDir(projectDir, pkg, releaseCfg, tools, buildEnv, ui)
+    })
+    checkpoint.markStep('deploy-dir', { deployDir })
+
+    let sourceVerlink = null
+    const resumableStage = Boolean(
+      checkpoint.canResume &&
+        checkpoint.data &&
+        checkpoint.data.stage &&
+        checkpoint.data.stage.link === stageLink &&
+        checkpoint.data.stage.deployDir === deployDir &&
+        parseLink(checkpoint.data.stage.sourceVerlink)
+    )
+
+    if (resumableStage) {
+      sourceVerlink = checkpoint.data.stage.sourceVerlink
+      ui.info(`Reusing staged verlink from checkpoint: ${sourceVerlink}`)
+    } else {
+      const stageResult = await ui.step('Staging deploy directory', async () => {
+        return stageDeployDir(tools, stageLink, deployDir, opts)
+      })
+      sourceVerlink = stageResult.verlink
+      checkpoint.markStep('stage', {
+        stage: {
+          link: stageLink,
+          deployDir,
+          sourceVerlink
+        }
+      })
+    }
+
+    let productionVersionedLink = null
+    let provisionResult = null
+    let multisigResult = null
+
+    if (!opts.dryRun) {
+      const resumableProvision = Boolean(
+        checkpoint.canResume &&
+          checkpoint.data &&
+          checkpoint.data.provision &&
+          checkpoint.data.provision.sourceVerlink === sourceVerlink &&
+          checkpoint.data.provision.provisionLink === provisionLink &&
+          checkpoint.data.provision.result
+      )
+
+      if (resumableProvision) {
+        productionVersionedLink = checkpoint.data.provision.productionVersionedLink || null
+        provisionResult = checkpoint.data.provision.result
+        ui.info('Reusing provision result from checkpoint')
+      } else {
+        productionVersionedLink = await ui.step('Resolving production base', async () => {
+          return resolveProductionVersionedLink(tools, releaseCfg)
+        })
+
+        provisionResult = await ui.step('Provisioning release', async () => {
+          return provision(tools, sourceVerlink, provisionLink, productionVersionedLink, opts, ui)
+        })
+        checkpoint.markStep('provision', {
+          provision: {
+            sourceVerlink,
+            provisionLink,
+            productionVersionedLink,
+            result: provisionResult
+          }
+        })
+      }
+
+      if (multisig.enabled) {
+        multisigResult = await ui.step('Running multisig release flow', async () => {
+          return runMultisigFlow({
+            tools,
+            projectDir,
+            multisig,
+            provisionLink,
+            opts,
+            ui
+          })
+        })
+      } else {
+        multisigResult = {
+          skipped: true,
+          reason: multisig.reason || (soloMode ? 'solo mode' : 'disabled')
+        }
+        ui.info(`Multisig skipped (${multisigResult.reason})`)
+      }
     } else {
       multisigResult = {
         skipped: true,
-        reason: multisig.reason || (soloMode ? 'solo mode' : 'disabled')
+        reason: 'dry-run'
       }
-      ui.info(`Multisig skipped (${multisigResult.reason})`)
+      ui.info('Dry run mode: provision and multisig skipped')
     }
-  } else {
-    multisigResult = {
-      skipped: true,
-      reason: 'dry-run'
-    }
-    ui.info('Dry run mode: provision and multisig skipped')
-  }
 
-  releaseCfg.state.lastRelease = {
-    at: new Date().toISOString(),
-    stage: {
-      link: stageLink,
-      verlink: sourceVerlink
-    },
-    provision: {
-      link: provisionLink,
+    releaseCfg.state.lastRelease = {
+      at: new Date().toISOString(),
+      stage: {
+        link: stageLink,
+        verlink: sourceVerlink
+      },
+      provision: {
+        link: provisionLink,
+        productionVersionedLink,
+        result: provisionResult
+      },
+      multisig: multisigResult
+    }
+
+    const outcome = {
+      projectDir,
+      packagePath,
+      deployDir,
+      stageLink,
+      provisionLink,
+      sourceVerlink,
       productionVersionedLink,
-      result: provisionResult
-    },
-    multisig: multisigResult
-  }
+      multisig: multisigResult,
+      updatedUpgrade: upgradeLink
+    }
 
-  saveConfig(configPath, config)
-
-  return {
-    projectDir,
-    packagePath,
-    deployDir,
-    stageLink,
-    provisionLink,
-    sourceVerlink,
-    productionVersionedLink,
-    multisig: multisigResult,
-    updatedUpgrade: upgradeLink
+    checkpoint.complete({
+      outcome
+    })
+    save()
+    return outcome
+  } catch (err) {
+    checkpoint.fail(err.reapStep || 'release', err)
+    save()
+    throw err
   }
 }
 
@@ -243,6 +346,8 @@ async function maybeRunVersioning(projectDir, releaseCfg, opts) {
 async function setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, opts = {}) {
   const cfg = releaseCfg.multisig || {}
   const ui = opts.ui
+  ensureMultisigDefaults(cfg, pkg.name || 'app')
+
   if (opts.solo) {
     return {
       enabled: false,
@@ -259,25 +364,26 @@ async function setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, 
     }
   }
 
-  cfg.configPath = cfg.configPath || './multisig.json'
-  cfg.storagePath = cfg.storagePath || './.reap/multisig-storage'
-  cfg.keysRoot = cfg.keysRoot || DEFAULT_KEYS_ROOT
-  if (typeof cfg.autoSeed !== 'boolean') cfg.autoSeed = true
-  cfg.quorum = Number(cfg.quorum || 1)
-  if (!cfg.namespace) cfg.namespace = pkg.name || 'app'
-  if (!Array.isArray(cfg.publicKeys)) cfg.publicKeys = []
-  if (!Array.isArray(cfg.autoSigners)) cfg.autoSigners = []
-
-  const configPath = resolveFrom(projectDir, cfg.configPath)
+  const configPath = resolveMultisigConfigPath(projectDir, cfg, opts.runId)
   const storagePath = resolveFrom(projectDir, cfg.storagePath)
   ensureDir(path.dirname(storagePath))
+  ensureDir(path.dirname(configPath))
 
   let discoveredKeys = listManagedSignerKeys(projectDir, cfg.keysRoot)
-  if (cfg.publicKeys.length === 0 && discoveredKeys.length > 0) {
-    cfg.publicKeys = discoveredKeys.map((entry) => entry.publicKey)
+  if (cfg.signers.length === 0 && discoveredKeys.length > 0) {
+    for (let i = 0; i < discoveredKeys.length; i++) {
+      const entry = discoveredKeys[i]
+      addSigner(cfg, {
+        label: entry.name,
+        publicKey: entry.publicKey,
+        keysDirectory: toRelative(projectDir, entry.dir),
+        passwordEnv: `HYPERCORE_SIGN_PASSWORD_${i + 1}`,
+        source: 'managed'
+      })
+    }
   }
 
-  if (cfg.publicKeys.length === 0) {
+  if (cfg.signers.length === 0) {
     if (ui) ui.info('No multisig keys configured, bootstrapping signer keys')
     const generated = await generateManagedKeys({
       projectAbs: projectDir,
@@ -285,41 +391,30 @@ async function setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, 
       count: Math.max(cfg.quorum, 1)
     })
     discoveredKeys = generated
-    cfg.publicKeys = generated.map((entry) => entry.publicKey)
-  }
-
-  if (cfg.autoSigners.length === 0 && discoveredKeys.length > 0) {
-    cfg.autoSigners = discoveredKeys.slice(0, Math.max(cfg.quorum, 1)).map((entry, index) => ({
-      keysDirectory: path.relative(projectDir, entry.dir).startsWith('.')
-        ? path.relative(projectDir, entry.dir)
-        : './' + path.relative(projectDir, entry.dir),
-      passwordEnv: `HYPERCORE_SIGN_PASSWORD_${index + 1}`
-    }))
-  }
-
-  if (!exists(configPath)) {
-    const parsedProvision = parseLink(provisionLink)
-    if (!parsedProvision) throw new Error(`Invalid provision link: ${provisionLink}`)
-
-    const generated = {
-      type: 'drive',
-      publicKeys: cfg.publicKeys,
-      namespace: cfg.namespace,
-      quorum: Number(cfg.quorum || 1),
-      srcKey: parsedProvision.key
-    }
-    writeJson(configPath, generated)
-    if (ui) ui.info(`Wrote ${configPath}`)
-  } else {
-    const existing = readJson(configPath)
-    const parsedProvision = parseLink(provisionLink)
-    if (!parsedProvision) throw new Error(`Invalid provision link: ${provisionLink}`)
-    if (existing.srcKey !== parsedProvision.key) {
-      existing.srcKey = parsedProvision.key
-      writeJson(configPath, existing)
-      if (ui) ui.info(`Updated srcKey in ${configPath}`)
+    for (let i = 0; i < generated.length; i++) {
+      const entry = generated[i]
+      addSigner(cfg, {
+        label: entry.name,
+        publicKey: entry.publicKey,
+        keysDirectory: toRelative(projectDir, entry.dir),
+        passwordEnv: `HYPERCORE_SIGN_PASSWORD_${i + 1}`,
+        source: 'managed'
+      })
     }
   }
+  syncDerivedSignerFields(cfg)
+
+  const validation = validateMultisig(cfg)
+  if (validation.errors.length > 0) {
+    throw new Error(`Multisig config invalid: ${validation.errors.join('; ')}`)
+  }
+  for (const warning of validation.warnings) {
+    if (ui) ui.warn(warning)
+  }
+
+  const multisigConfig = buildMultisigConfig(cfg, provisionLink)
+  writeJson(configPath, multisigConfig)
+  if (ui) ui.info(`Prepared multisig config ${configPath}`)
 
   const { output } = await runTool(tools.hyperMultisig, [
     '--config',
@@ -341,6 +436,7 @@ async function setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, 
   return {
     enabled: true,
     configPath,
+    runtimeConfig: !cfg.configPath,
     storagePath,
     keysRoot: cfg.keysRoot,
     link,
@@ -350,9 +446,11 @@ async function setupMultisig(projectDir, pkg, releaseCfg, tools, provisionLink, 
     forceCommitDangerous: Boolean(cfg.forceCommitDangerous),
     peerUpdateTimeout: cfg.peerUpdateTimeout,
     autoSeed: cfg.autoSeed !== false,
+    minSeedPeers: Number(cfg.minSeedPeers || 2),
     responses: cfg.responses || [],
     responsesFile: cfg.responsesFile ? resolveFrom(projectDir, cfg.responsesFile) : null,
-    autoSigners: Array.isArray(cfg.autoSigners) ? cfg.autoSigners : []
+    autoSigners: Array.isArray(cfg.autoSigners) ? cfg.autoSigners : [],
+    collect: cfg.collect || {}
   }
 }
 
@@ -420,7 +518,7 @@ function inferDefaultBuildCommands(pkg, releaseCfg, projectDir) {
   }
 }
 
-async function runBuildCommands(projectDir, releaseCfg, buildEnv, ui) {
+async function runBuildCommands(projectDir, releaseCfg, buildEnv, opts, ui) {
   const commands = (releaseCfg.build && releaseCfg.build.commands) || []
   for (const command of commands) {
     if (!command || typeof command !== 'string') continue
@@ -814,12 +912,22 @@ async function runMultisigFlow({ tools, projectDir, multisig, provisionLink, opt
     }
     if (ui) ui.info('Multisig signing request created')
 
+    await maybeRunRequestHook(multisig, {
+      signingRequest,
+      provisionLink,
+      multisigLink: multisig.link,
+      projectDir,
+      ui
+    })
+
     const responses = await collectMultisigResponses({
       tools,
       projectDir,
-      releaseCfg,
       multisig,
-      signingRequest
+      signingRequest,
+      provisionLink,
+      opts,
+      ui
     })
 
     if (responses.length === 0) {
@@ -864,9 +972,10 @@ async function runMultisigFlow({ tools, projectDir, multisig, provisionLink, opt
       })
     } catch (err) {
       if (insufficientPeersAtVerify && isInvalidSignatureError(err)) {
+        const minPeers = Number(multisig.minSeedPeers || 2)
         throw new Error(
           'Multisig commit could not be finalized because source core is not sufficiently seeded across independent peers.\n' +
-            'Need at least 2 full peers for source link before verify/commit can complete.\n' +
+            `Need at least ${minPeers} full peers for source link before verify/commit can complete.\n` +
             `Source link: pear://${parsedProvision.key}\n` +
             'Run `pear seed <source-link>` on another always-online machine and retry `reap release`.'
         )
@@ -885,6 +994,11 @@ async function runMultisigFlow({ tools, projectDir, multisig, provisionLink, opt
     if (transientSeeder) {
       await transientSeeder.stop()
       if (ui) ui.info(`Temporary seed stopped for ${unversionedProvisionLink}`)
+    }
+    if (multisig.runtimeConfig && multisig.configPath && exists(multisig.configPath)) {
+      try {
+        fs.unlinkSync(multisig.configPath)
+      } catch {}
     }
   }
 }
@@ -972,7 +1086,15 @@ function startTransientPearSeed(tools, link, cwd) {
   return { ready, stop }
 }
 
-async function collectMultisigResponses({ tools, projectDir, multisig, signingRequest }) {
+async function collectMultisigResponses({
+  tools,
+  projectDir,
+  multisig,
+  signingRequest,
+  provisionLink,
+  opts,
+  ui
+}) {
   const responses = new Set()
 
   for (const response of multisig.responses || []) {
@@ -986,6 +1108,40 @@ async function collectMultisigResponses({ tools, projectDir, multisig, signingRe
       .map((line) => line.trim())
       .filter(Boolean)
     for (const response of fromFile) responses.add(response)
+  }
+
+  if (multisig.collect && multisig.collect.responsesDir) {
+    const responsesDir = resolveFrom(projectDir, multisig.collect.responsesDir)
+    if (responsesDir && exists(responsesDir)) {
+      const files = fs.readdirSync(responsesDir)
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(responsesDir, file), 'utf8')
+        for (const token of extractResponseTokens(content, signingRequest)) {
+          responses.add(token)
+        }
+      }
+    }
+  }
+
+  if (multisig.collect && multisig.collect.responsesCommand) {
+    const env = collectCommandEnv({
+      signingRequest,
+      provisionLink,
+      multisigLink: multisig.link,
+      projectDir
+    })
+    const { stdout, stderr } = await run('sh', ['-lc', multisig.collect.responsesCommand], {
+      cwd: projectDir,
+      env,
+      streamOutput: false,
+      allowFailure: false,
+      label: 'collect responses command'
+    })
+    const output = [stdout, stderr].filter(Boolean).join('\n')
+    for (const token of extractResponseTokens(output, signingRequest)) {
+      responses.add(token)
+    }
+    if (ui) ui.info(`Collected ${responses.size} response(s) so far`)
   }
 
   const requiredResponses = Math.max(Number(multisig.quorum || 1), 1)
@@ -1011,7 +1167,7 @@ async function collectMultisigResponses({ tools, projectDir, multisig, signingRe
 
   for (const signer of autoSigners) {
     const passwordEnv = signer.passwordEnv || 'HYPERCORE_SIGN_PASSWORD'
-    const password = await resolveSignerPassword(passwordEnv, signer)
+    const password = await resolveSignerPassword(passwordEnv, signer, opts)
 
     const signerEnv = {}
     if (signer.keysDirectory) {
@@ -1039,8 +1195,43 @@ async function collectMultisigResponses({ tools, projectDir, multisig, signingRe
   return Array.from(responses)
 }
 
-async function resolveSignerPassword(passwordEnv, signer) {
+async function maybeRunRequestHook(multisig, ctx) {
+  if (!multisig.collect || !multisig.collect.requestCommand) return
+
+  const env = collectCommandEnv({
+    signingRequest: ctx.signingRequest,
+    provisionLink: ctx.provisionLink,
+    multisigLink: ctx.multisigLink,
+    projectDir: ctx.projectDir
+  })
+
+  await run('sh', ['-lc', multisig.collect.requestCommand], {
+    cwd: ctx.projectDir,
+    env,
+    streamOutput: false,
+    label: 'request command'
+  })
+  if (ctx.ui) ctx.ui.info('Ran multisig request hook')
+}
+
+function extractResponseTokens(output, signingRequest) {
+  const cleaned = String(output || '').replace(/\u001b\[[0-9;?]*[A-Za-z]/g, '')
+  const tokens = cleaned.match(/[a-z0-9]{80,}/gi) || []
+  const request = String(signingRequest || '').toLowerCase()
+  const out = []
+  for (const token of tokens) {
+    const normalized = token.toLowerCase()
+    if (request && normalized === request) continue
+    out.push(normalized)
+  }
+  return out
+}
+
+async function resolveSignerPassword(passwordEnv, signer, opts = {}) {
   if (process.env[passwordEnv]) return process.env[passwordEnv]
+  if (opts.nonInteractive) {
+    throw new Error(`Missing password env var in non-interactive mode: ${passwordEnv}`)
+  }
   if (!process.stdin.isTTY) {
     throw new Error(`Missing password env var for autosigner: ${passwordEnv}`)
   }

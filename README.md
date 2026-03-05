@@ -7,8 +7,10 @@ Node.js CLI spike for automating Pear app release ceremony.
 ```sh
 reap release
 reap release --solo
+reap release --json --non-interactive
 reap configure
 reap keys
+reap signers
 ```
 
 `reap configure` is an interactive wizard (powered by `prompts`) that sets up:
@@ -77,12 +79,28 @@ Example:
     },
     "multisig": {
       "enabled": false,
-      "configPath": "./multisig.json",
+      "configPath": null,
       "storagePath": "./.reap/multisig-storage",
       "keysRoot": "./.reap/keys",
       "firstCommit": null,
+      "signers": [
+        {
+          "id": "signer-1",
+          "label": "Primary",
+          "publicKey": "signer-public-key",
+          "keysDirectory": "./.reap/keys/signer-1",
+          "passwordEnv": "HYPERCORE_SIGN_PASSWORD_1",
+          "revoked": false
+        }
+      ],
+      "collect": {
+        "requestCommand": null,
+        "responsesCommand": null,
+        "responsesDir": null
+      },
+      "minSeedPeers": 2,
       "publicKeys": [
-        "signer-public-key"
+        "derived-from-signers"
       ],
       "autoSeed": true,
       "namespace": "hello-pear-electron",
@@ -114,12 +132,15 @@ Example:
 8. Provision (`pear provision`).
 9. Multisig request, verify, and commit (`hyper-multisig`) when multisig is active, including optional autosigning (`hypercore-sign`) and temporary auto-seeding of provision source drive.
 10. End-of-release seeding handoff: prompt to seed immediately, or print exact `pear seed ...` command when non-interactive.
+11. Checkpoint persistence for resume (`reap release --resume`) and strict preflight validation before mutation.
 
 Note: final multisig verify/commit still requires at least two independent full peers for the provision source core, per `hyper-multisig` safety checks.
 
 For lone-developer releases, use `reap release --solo` (or set `release.solo: true`) so release goes straight through stage + provision without multisig peer requirements.
 
 Release output is intentionally compact: underlying tool output is swallowed and replaced by short step-by-step status lines with activity indicators.
+
+`reap` now supports single-config operation: `.reap.json` is the source of truth for signer roster and multisig settings. `multisig.json` is optional legacy compatibility; when omitted, reap generates a temporary runtime config automatically.
 
 Long-running post-release seeding is still manual; `reap` only performs temporary seeding needed to complete multisig request flow.
 
@@ -137,10 +158,23 @@ Manage signer keys with:
 reap keys list
 reap keys public
 reap keys generate --count 2
+reap keys import --config .reap.json --public-key <key> --label "Laptop"
+reap keys rotate --config .reap.json --id signer-1
+reap keys revoke --config .reap.json --id signer-1
+reap keys doctor --config .reap.json
 reap keys generate --config .reap.pearaint.json --count 2
 ```
 
 `reap keys generate` creates project-managed keys under `.reap/keys/signer-*` (or your configured `release.multisig.keysRoot`) using `hypercore-sign-generate-keys`.
+
+Signer roster management:
+
+```sh
+reap signers list --config .reap.json
+reap signers add --config .reap.json --id signer-2 --public-key <key>
+reap signers remove --config .reap.json --id signer-2
+reap signers quorum --config .reap.json 2
+```
 
 ## Tool bootstrap
 

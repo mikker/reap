@@ -5,6 +5,7 @@ const { saveConfig } = require('./config')
 const { parseLink, readJson, readJsonLines, resolveFrom, writeJson, exists } = require('./utils')
 const { run } = require('./run')
 const { DEFAULT_KEYS_ROOT, generateManagedKeys } = require('./keys')
+const { ensureMultisigDefaults } = require('./multisig-state')
 
 async function configure(configState, opts = {}) {
   const { config, path: configPath } = configState
@@ -204,10 +205,13 @@ function hydrateSigningConfig(releaseCfg, forgeHints) {
 
 async function configureMultisig(releaseCfg, projectAbs, pkg, opts) {
   const cfg = releaseCfg.multisig
-  const multisigPath = resolveFrom(projectAbs, cfg.configPath || './multisig.json')
+  const configuredPath = clean(cfg.configPath)
+  const legacyPath = resolveFrom(projectAbs, './multisig.json')
+  const multisigPath = configuredPath ? resolveFrom(projectAbs, configuredPath) : legacyPath
   const fileConfig = exists(multisigPath) ? readJson(multisigPath) : null
 
-  cfg.configPath = clean(cfg.configPath) || './multisig.json'
+  ensureMultisigDefaults(cfg, pkg.name || 'app')
+  cfg.configPath = configuredPath || null
   cfg.storagePath = clean(cfg.storagePath) || './.reap/multisig-storage'
   cfg.keysRoot = clean(cfg.keysRoot) || DEFAULT_KEYS_ROOT
 
@@ -381,6 +385,7 @@ async function configureMultisig(releaseCfg, projectAbs, pkg, opts) {
 }
 
 function maybeWriteMultisigFile(multisigCfg, provisionLink, projectAbs) {
+  if (!multisigCfg.configPath) return
   if (!multisigCfg.namespace || !Array.isArray(multisigCfg.publicKeys) || multisigCfg.publicKeys.length === 0) {
     return
   }

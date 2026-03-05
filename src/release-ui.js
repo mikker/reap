@@ -6,6 +6,7 @@ class ReleaseUi {
   constructor(opts = {}) {
     this.useColor = opts.color !== false && process.stdout.isTTY && !process.env.NO_COLOR
     this.useSpinner = opts.spinner !== false && process.stdout.isTTY
+    this.silent = Boolean(opts.silent)
     this.frames = ['-', '\\', '|', '/']
     this.frameIndex = 0
     this.timer = null
@@ -49,6 +50,7 @@ class ReleaseUi {
   }
 
   _beginSpinner(label) {
+    if (this.silent) return
     this._endSpinner()
 
     if (!this.useSpinner) {
@@ -64,6 +66,7 @@ class ReleaseUi {
   }
 
   _endSpinner(state, label) {
+    if (this.silent) return
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = null
@@ -86,6 +89,7 @@ class ReleaseUi {
   }
 
   _line(message) {
+    if (this.silent) return
     this._endSpinner()
     process.stdout.write(`${message}\n`)
   }
