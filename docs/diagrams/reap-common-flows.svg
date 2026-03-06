@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 848.2540833333333 1231.811" width="848.2540833333333" height="1231.811" style="--bg:#ffffff;--fg:#1f2328;--line:#d1d9e0;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="A" data-to="B" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="333.3495833333334,76.9 333.3495833333334,124.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B" data-to="C" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Yes" points="308.4024166666667,249.63583333333327 308.4024166666667,384.24800000000005 116.55000000000001,384.24800000000005 116.55000000000001,464.548" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="C" data-to="D" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="116.55000000000001,501.448 116.55000000000001,549.448" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B" data-to="E" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="No" points="358.29675000000003,249.63583333333332 358.29675000000003,310.58299999999997 417.30258333333336,310.58299999999997 417.30258333333336,390.88300000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="E" data-to="F" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Yes" points="392.1084166666667,516.8538333333333 392.1084166666667,554.048 247.4309166666667,554.048 247.4309166666667,634.348" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="F" data-to="G" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="247.4309166666667,671.2479999999999 247.4309166666667,719.2479999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="G" data-to="H" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="247.4309166666667,756.1479999999999 247.4309166666667,804.1479999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="E" data-to="I" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="No" points="442.49675,516.8538333333333 442.49675,554.048 520.5215833333334,554.048 520.5215833333334,634.348" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="I" data-to="J" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Yes" points="494.5864166666667,764.0238333333332 494.5864166666667,921.411 424.3420833333334,921.411 424.34208333333333,1001.7109999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="I" data-to="K" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="No" points="546.45675,764.0238333333333 546.45675,825.959 616.7010833333334,825.959 616.7010833333334,906.2589999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="K" data-to="L" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Yes" points="590.6424166666667,1036.5523333333333 590.6424166666667,1074.6109999999999 501.6980833333334,1074.6109999999999 501.6980833333334,1154.9109999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="K" data-to="M" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="No" points="642.75975,1036.552333333333 642.75975,1074.6109999999999 731.7040833333333,1074.6109999999999 731.7040833333333,1154.9109999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="B" data-to="C" data-label="Yes">
+  <rect x="98.05000000000001" y="391.24800000000005" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="116.37900000000002" y="406.398" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Yes</text>
+</g>
+<g class="edge-label" data-from="B" data-to="E" data-label="No">
+  <rect x="401.80258333333336" y="317.58299999999997" width="30.718000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="417.16158333333334" y="332.73299999999995" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No</text>
+</g>
+<g class="edge-label" data-from="E" data-to="F" data-label="Yes">
+  <rect x="228.9309166666667" y="561.048" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="247.2599166666667" y="576.198" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Yes</text>
+</g>
+<g class="edge-label" data-from="E" data-to="I" data-label="No">
+  <rect x="505.02158333333335" y="561.048" width="30.718000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="520.3805833333333" y="576.198" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No</text>
+</g>
+<g class="edge-label" data-from="I" data-to="J" data-label="Yes">
+  <rect x="405.8420833333334" y="928.411" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="424.1710833333334" y="943.5609999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Yes</text>
+</g>
+<g class="edge-label" data-from="I" data-to="K" data-label="No">
+  <rect x="601.2010833333334" y="832.959" width="30.718000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="616.5600833333334" y="848.1089999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No</text>
+</g>
+<g class="edge-label" data-from="K" data-to="L" data-label="Yes">
+  <rect x="483.1980833333334" y="1081.6109999999999" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="501.5270833333334" y="1096.761" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Yes</text>
+</g>
+<g class="edge-label" data-from="K" data-to="M" data-label="No">
+  <rect x="716.2040833333333" y="1081.6109999999999" width="30.718000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="731.5630833333333" y="1096.761" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No</text>
+</g>
+<g class="node" data-id="A" data-label="What are you trying to do?" data-shape="rectangle">
+  <rect x="237.53358333333335" y="40" width="191.63200000000003" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="333.3495833333334" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">What are you trying to do?</text>
+</g>
+<g class="node" data-id="B" data-label="First release?" data-shape="diamond">
+  <polygon points="333.3495833333334,124.9 408.1910833333334,199.7415 333.3495833333334,274.58299999999997 258.5080833333334,199.7415" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="333.3495833333334" y="199.7415" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">First release?</text>
+</g>
+<g class="node" data-id="C" data-label="reap configure" data-shape="rectangle">
+  <rect x="52.226500000000044" y="464.548" width="128.647" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="116.55000000000004" y="482.998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap configure</text>
+</g>
+<g class="node" data-id="D" data-label="reap release --solo" data-shape="rectangle">
+  <rect x="40" y="549.448" width="153.10000000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="116.55000000000001" y="567.898" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap release --solo</text>
+</g>
+<g class="node" data-id="E" data-label="Team signing?" data-shape="diamond">
+  <polygon points="417.30258333333336,390.88300000000004 492.88508333333334,466.4655 417.30258333333336,542.048 341.7200833333334,466.4655" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="417.30258333333336" y="466.4655" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Team signing?</text>
+</g>
+<g class="node" data-id="F" data-label="reap keys generate / import" data-shape="rectangle">
+  <rect x="146.7984166666667" y="634.348" width="201.265" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="247.4309166666667" y="652.798" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap keys generate / import</text>
+</g>
+<g class="node" data-id="G" data-label="reap signers add + quorum" data-shape="rectangle">
+  <rect x="147.90991666666667" y="719.2479999999999" width="199.042" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="247.4309166666667" y="737.698" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap signers add + quorum</text>
+</g>
+<g class="node" data-id="H" data-label="reap release" data-shape="rectangle">
+  <rect x="188.29441666666668" y="804.1479999999999" width="118.273" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="247.4309166666667" y="822.598" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap release</text>
+</g>
+<g class="node" data-id="I" data-label="Release failed?" data-shape="diamond">
+  <polygon points="520.5215833333334,634.348 598.3270833333333,712.1534999999999 520.5215833333334,789.9589999999998 442.7160833333334,712.1534999999999" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="520.5215833333334" y="712.1534999999999" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Release failed?</text>
+</g>
+<g class="node" data-id="J" data-label="reap release --resume" data-shape="rectangle">
+  <rect x="338.15908333333334" y="1001.7109999999999" width="172.36599999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="424.34208333333333" y="1020.161" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap release --resume</text>
+</g>
+<g class="node" data-id="K" data-label="Need CI output?" data-shape="diamond">
+  <polygon points="616.7010833333334,906.2589999999999 694.8770833333334,984.435 616.7010833333334,1062.6109999999999 538.5250833333333,984.435" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="616.7010833333334" y="984.435" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Need CI output?</text>
+</g>
+<g class="node" data-id="L" data-label="reap release --json --non-interactive" data-shape="rectangle">
+  <rect x="376.2420833333334" y="1154.9109999999998" width="250.91199999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="501.6980833333334" y="1173.3609999999999" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap release --json --non-interactive</text>
+</g>
+<g class="node" data-id="M" data-label="reap release --solo" data-shape="rectangle">
+  <rect x="655.1540833333333" y="1154.9109999999998" width="153.10000000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="731.7040833333333" y="1173.3609999999999" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">reap release --solo</text>
+</g>
+</svg>
