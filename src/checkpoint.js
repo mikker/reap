@@ -1,7 +1,4 @@
-function createCheckpointManager({ releaseCfg, save, resume = false }) {
-  if (!releaseCfg.state) releaseCfg.state = {}
-
-  const previous = releaseCfg.state.checkpoint || null
+function createCheckpointManager({ previous = null, save, resume = false }) {
   const canResume = Boolean(
     resume &&
       previous &&
@@ -28,8 +25,7 @@ function createCheckpointManager({ releaseCfg, save, resume = false }) {
         error: null
       }
 
-  releaseCfg.state.checkpoint = checkpoint
-  save()
+  save(checkpoint)
 
   return {
     runId,
@@ -46,14 +42,14 @@ function createCheckpointManager({ releaseCfg, save, resume = false }) {
           ...patch
         }
       }
-      save()
+      save(checkpoint)
     },
     fail(step, err) {
       checkpoint.status = 'failed'
       checkpoint.step = step || checkpoint.step
       checkpoint.updatedAt = new Date().toISOString()
       checkpoint.error = err ? summarizeError(err) : null
-      save()
+      save(checkpoint)
     },
     complete(summaryPatch) {
       checkpoint.status = 'completed'
@@ -64,7 +60,7 @@ function createCheckpointManager({ releaseCfg, save, resume = false }) {
         ...(checkpoint.data || {}),
         ...(summaryPatch || {})
       }
-      save()
+      save(checkpoint)
     }
   }
 }

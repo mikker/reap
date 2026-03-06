@@ -18,6 +18,7 @@ const { DEFAULT_KEYS_ROOT, generateManagedKeys } = require('./keys')
 const { createReleaseUi } = require('./release-ui')
 const { formatOutputTail, isWarningOnlyFailure, warningLines } = require('./build-output')
 const { createCheckpointManager } = require('./checkpoint')
+const { loadRuntimeState, saveRuntimeState } = require('./runtime-state')
 const { runPreflight } = require('./preflight')
 const { discoverArtifacts } = require('./artifact-discovery')
 const { detectForgeHints } = require('./forge-hints')
@@ -37,7 +38,7 @@ async function release(configState, opts = {}) {
   const releaseCfg = config.release
   const configBaseDir = path.dirname(configPath)
   const ui = opts.ui || createReleaseUi()
-  const save = () => saveConfig(configPath, config)
+  const saveConfigOnly = () => saveConfig(configPath, config)
 
   const projectDir = resolveFrom(configBaseDir, releaseCfg.projectDir)
   if (!projectDir || !exists(projectDir)) {
@@ -49,14 +50,23 @@ async function release(configState, opts = {}) {
     throw new Error(`release.packageJson not found: ${releaseCfg.packageJson}`)
   }
 
+  const runtime = loadRuntimeState(projectDir)
+  const saveAll = () => {
+    saveConfigOnly()
+    saveRuntimeState(runtime)
+  }
+
   const pkg = readJson(packagePath)
   inferSigningFromForge(releaseCfg, projectDir)
   ensureMultisigDefaults(releaseCfg.multisig, pkg.name || 'app')
   mergeLegacySigners(releaseCfg.multisig, projectDir)
   const soloMode = resolveSoloMode(releaseCfg, opts)
   const checkpoint = createCheckpointManager({
-    releaseCfg,
-    save,
+    previous: runtime.state.checkpoint,
+    save: (nextCheckpoint) => {
+      runtime.state.checkpoint = nextCheckpoint
+      saveAll()
+    },
     resume: Boolean(opts.resume)
   })
 
@@ -221,7 +231,7 @@ async function release(configState, opts = {}) {
       ui.info('Dry run mode: provision and multisig skipped')
     }
 
-    releaseCfg.state.lastRelease = {
+    runtime.state.lastRelease = {
       at: new Date().toISOString(),
       stage: {
         link: stageLink,
@@ -250,11 +260,9 @@ async function release(configState, opts = {}) {
     checkpoint.complete({
       outcome
     })
-    save()
     return outcome
   } catch (err) {
     checkpoint.fail(err.reapStep || 'release', err)
-    save()
     throw err
   }
 }

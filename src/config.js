@@ -57,10 +57,6 @@ const DEFAULT_CONFIG = {
         responsesDir: null
       },
       minSeedPeers: 2
-    },
-    state: {
-      lastRelease: null,
-      checkpoint: null
     }
   }
 }
@@ -78,6 +74,7 @@ function loadConfig(configPath) {
 
   const loaded = readJson(absConfigPath)
   const merged = deepMerge(clone(DEFAULT_CONFIG), loaded)
+  if (merged.release) delete merged.release.state
 
   return {
     config: merged,

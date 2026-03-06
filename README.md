@@ -107,6 +107,7 @@ reap signers quorum 2
 `reap` uses `.reap.json` (or `--config <path>`).
 
 New config files are intentionally compact (empty/minimal), and only non-default values are written over time.
+Runtime status is stored separately in `.reap/state.json` inside the project directory.
 
 Typical values you may set manually:
 
@@ -139,3 +140,4 @@ Typical values you may set manually:
 - If `multisig.enabled` is `false`, releases default to solo behavior.
 - Build warnings are shown. Warning-only non-zero build exits are treated as warnings and release continues.
 - After release, `reap` offers immediate seeding or prints the exact seed command.
+- Resume/checkpoint and last-release status live in `.reap/state.json`, not in `.reap.json`.

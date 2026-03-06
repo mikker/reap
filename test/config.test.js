@@ -47,3 +47,26 @@ test('saveConfig strips defaults and keeps only non-default values', () => {
     }
   })
 })
+
+test('loadConfig drops legacy release.state from config', () => {
+  const dir = makeTempDir()
+  const configPath = path.join(dir, '.reap.json')
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(
+      {
+        release: {
+          state: {
+            lastRelease: { at: '2026-01-01T00:00:00.000Z' },
+            checkpoint: { status: 'failed' }
+          }
+        }
+      },
+      null,
+      2
+    )
+  )
+
+  const state = loadConfig(configPath)
+  assert.equal(state.config.release.state, undefined)
+})
