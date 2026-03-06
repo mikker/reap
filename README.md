@@ -1,4 +1,4 @@
-# reap
+# reap (not official, experimental)
 
 `reap` is a CLI for shipping Pear apps with one entrypoint:
 
